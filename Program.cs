@@ -6,14 +6,21 @@ using System.Threading.Tasks;
 
 public class LowestHashFinderOptimized
 {
-    private const int MaxConcurrency = 16; // Adjust based on system capabilities
+    private static int MaxConcurrency = Environment.ProcessorCount; // Adjust based on system capabilities
     private const int TotalNonces = System.Int32.MaxValue; // Total number of nonce values to check
     private static readonly object lockObject = new();
 
-    public static void Main()
+    public static int Main(string[] args)
     {
-        string username = "d34th";
+        if (args.Length == 0)
+        {
+             System.Console.WriteLine("Please enter a username");
+            return 1;
+        } else {
+        string username = args[0];
         FindLowestHashParallel(username);
+        return 0;
+        }
     }
 
     public static void FindLowestHashParallel(string username)
