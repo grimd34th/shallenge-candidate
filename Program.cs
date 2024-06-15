@@ -1,53 +1,83 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 
-public class LowestHashFinder
+public class LowestHashFinderOptimized
 {
+    private const int MaxConcurrency = 16; // Adjust based on system capabilities
+    private const int TotalNonces = System.Int32.MaxValue; // Total number of nonce values to check
+    private static readonly object lockObject = new();
+
     public static void Main()
     {
-        string username = "GenericToon";
-        FindLowestHash(username);
+        string username = "d34th";
+        FindLowestHashParallel(username);
     }
 
-    public static void FindLowestHash(string username)
+    public static void FindLowestHashParallel(string username)
     {
-        int nonce = 0;
-        string lowestHash = null;
+        string lowestHash = string.Empty;
         int lowestNonce = 0;
+
+        // Calculate number of nonces per partition
+        int noncesPerPartition = TotalNonces / MaxConcurrency;
         
-        while (true)
+        // Partition nonces into smaller segments
+        List<Task> tasks = [];
+
+        for (int partition = 0; partition < MaxConcurrency; partition++)
         {
-            string data = $"{username}/{nonce}";
-            string hashValue = CalculateSHA256Hash(data);
+            int startNonce = partition * noncesPerPartition;
+            int endNonce = Math.Min(startNonce + noncesPerPartition, TotalNonces);
 
-            if (lowestHash == null || string.Compare(hashValue, lowestHash, StringComparison.OrdinalIgnoreCase) < 0)
+            tasks.Add(Task.Run(() =>
             {
-                lowestHash = hashValue;
-                lowestNonce = nonce;
-            }
+                string localLowestHash = string.Empty;
+                int localLowestNonce = 0;
 
-            nonce++;
+                for (int nonce = startNonce; nonce < endNonce; nonce++)
+                {
+                    string data = $"{username}/{nonce}";
+                    string hashValue = CalculateSHA256Hash(data);
 
-            // You can adjust the range of nonce values or add a condition to stop based on a specific criteria
-            if (nonce > System.Int32.MaxValue)
-                break;
+                    lock (lockObject) // Ensure thread-safe access to shared variables
+                    {
+                        if (localLowestHash == string.Empty || string.Compare(hashValue, localLowestHash, StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            localLowestHash = hashValue;
+                            localLowestNonce = nonce;
+                        }
+                    }
+                }
+
+                // Merge local results into global result
+                lock (lockObject)
+                {
+                    if (lowestHash == string.Empty || (localLowestHash != null && string.Compare(localLowestHash, lowestHash, StringComparison.OrdinalIgnoreCase) < 0))
+                    {
+                        lowestHash = localLowestHash;
+                        lowestNonce = localLowestNonce;
+                    }
+                }
+            }));
         }
+
+        // Wait for all tasks to complete
+        Task.WaitAll([.. tasks]);
 
         Console.WriteLine($"Lowest hash: {lowestHash}, achieved with {username}/{lowestNonce}");
     }
 
     public static string CalculateSHA256Hash(string input)
     {
-        using (SHA256 sha256 = SHA256.Create())
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        StringBuilder builder = new();
+        for (int i = 0; i < bytes.Length; i++)
         {
-            byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                builder.Append(bytes[i].ToString("x2"));
-            }
-            return builder.ToString();
+            builder.Append(bytes[i].ToString("x2"));
         }
+        return builder.ToString();
     }
 }
