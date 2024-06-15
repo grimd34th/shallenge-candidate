@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 public class LowestHashFinderOptimized
 {
-    private static int MaxConcurrency = Environment.ProcessorCount; // Adjust based on system capabilities
-    private const int TotalNonces = System.Int32.MaxValue; // Total number of nonce values to check
+    private static readonly int MaxConcurrency = Environment.ProcessorCount; // Adjust based on system capabilities
+    private const long TotalNonces = System.Int64.MaxValue; // Total number of nonce values to check
     private static readonly object lockObject = new();
 
     public static int Main(string[] args)
@@ -26,25 +26,25 @@ public class LowestHashFinderOptimized
     public static void FindLowestHashParallel(string username)
     {
         string lowestHash = string.Empty;
-        int lowestNonce = 0;
+        long lowestNonce = 0;
 
         // Calculate number of nonces per partition
-        int noncesPerPartition = TotalNonces / MaxConcurrency;
+        long noncesPerPartition = TotalNonces / MaxConcurrency;
         
         // Partition nonces into smaller segments
         List<Task> tasks = [];
 
         for (int partition = 0; partition < MaxConcurrency; partition++)
         {
-            int startNonce = partition * noncesPerPartition;
-            int endNonce = Math.Min(startNonce + noncesPerPartition, TotalNonces);
+            long startNonce = partition * noncesPerPartition;
+            long endNonce = Math.Min(startNonce + noncesPerPartition, TotalNonces);
 
             tasks.Add(Task.Run(() =>
             {
                 string localLowestHash = string.Empty;
-                int localLowestNonce = 0;
+                long localLowestNonce = 0;
 
-                for (int nonce = startNonce; nonce < endNonce; nonce++)
+                for (long nonce = startNonce; nonce < endNonce; nonce++)
                 {
                     string data = $"{username}/{nonce}";
                     string hashValue = CalculateSHA256Hash(data);
